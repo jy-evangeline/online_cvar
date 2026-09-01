@@ -1,0 +1,13 @@
+# Whitelist-style ignore: everything is ignored by default and only the files
+# tracked in this repo are re-included. This keeps the local results_*/
+# outputs_*/ and data/ trees (several GB) out of version control.
+*
+
+!.gitignore
+!README.md
+!online_cvar_invest_ru.py
+
+!toxicity_scores/
+toxicity_scores/*
+!toxicity_scores/online_cvar_detoxify_ru.py
+!toxicity_scores/run_ru.sh
