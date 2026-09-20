@@ -1,5 +1,7 @@
 # Online CVaR Control (Rockafellar–Uryasev)
 
+Official implementation of [**Adversarially Robust Control of Conditional Value-at-Risk via Rockafellar-Uryasev Conformal Inference**](https://arxiv.org/abs/2606.00320).
+
 Online control of the **Conditional Value-at-Risk (CVaR)** of a loss sequence via the
 Rockafellar–Uryasev (RU) variational representation, applied to two settings:
 risk-managed portfolio allocation and toxicity filtering for LLM outputs.
