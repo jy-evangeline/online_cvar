@@ -21,60 +21,131 @@ Both implementations share the same two-level scheme:
 The RU surrogate estimate at step `t` is `ĈVaR_t = c_t + (1−β)⁻¹ (L_t − c_t)₊`.
 Initialization is `c₁ = ½`, `q₀ = max(1, β/(1−β))²`. Because `c` is constrained to
 `[0, 1]`, losses are expected on roughly that scale — the investment script
-normalizes them automatically (see `--no_normalize_losses`).
+normalizes them automatically (disable with `--no_normalize_losses`).
 
 ## Contents
 
 | File | Description |
 | --- | --- |
-| `online_cvar_invest_ru.py` | Portfolio allocation. `λ_t` is the risky-asset weight; loss is `L_t(λ) = −(λ·r_risky + (1−λ)·r_rf)`, extended outside `[lam_min, lam_max]` by its inf/sup over the range (the loss is linear in `λ`, so both are attained at the endpoints). Emits a per-period CSV plus CVaR / rolling-CVaR / `c_t` / `λ_t` / cumulative-return / loss plots. |
-| `toxicity_scores/online_cvar_detoxify_ru.py` | LLM toxicity control. `λ_t` is a threshold on machine (Detoxify fine-tuned) scores; the loss is the human toxicity of the responses admitted at that threshold. Machine scores are rank-normalized to an empirical CDF on `(0, 1]`. Supports `uniform`, `adversarial` (piecewise-linear ramp 0.5 → 1 → 3) and `adversarial_jump` distribution shift, and compares against a static-λ distortion-risk-control baseline. |
-| `toxicity_scores/run_ru.sh` | Sweep driver for the toxicity experiment: 4 CVaR levels β ∈ {0.75, 0.8, 0.85, 0.9} × 3 shift settings. |
+| `online_cvar_invest_ru.py` | Portfolio allocation. `λ_t` is the risky-asset weight; loss is `L_t(λ) = −(λ·r_risky + (1−λ)·r_rf)`, extended outside `[lam_min, lam_max]` by its inf/sup over the range (the loss is linear in `λ`, so both are attained at the endpoints). |
+| `run_20_26_ru.sh` | **Reproduces the investment results** on `2020_2026.csv` for β ∈ {0.90, 0.85, 0.80, 0.75}. |
+| `2020_2026.csv` | Daily S&P 500 close (`^GSPC`) and 10-year Treasury yield (`DGS10`), 2020-01-02 to 2025-12-31 (1,508 rows). |
+| `toxicity_scores/online_cvar_detoxify_ru.py` | LLM toxicity control. `λ_t` is a threshold on machine (fine-tuned Detoxify) scores; the loss is the human toxicity of the responses admitted at that threshold. Machine scores are rank-normalized to an empirical CDF on `(0, 1]`. |
+| `toxicity_scores/run_ru.sh` | **Reproduces the toxicity results**: 4 CVaR levels × 3 distribution-shift settings. |
+| `toxicity_scores/data_slim/` | Numeric-only toxicity data (~6 MB) — everything needed to reproduce. |
+| `toxicity_scores/build_slim_data.py` | Rebuilds `data_slim/` from the raw generations. |
+| `toxicity_scores/download_raw_data.sh` | Fetches the raw generations from the Hugging Face Hub. |
 
-## Usage
-
-### Portfolio allocation
-
-```bash
-python online_cvar_invest_ru.py \
-  --data_csv 1987_2026.csv \
-  --risky_col risky_close --rf_col rf_yield --rf_is_yield \
-  --beta 0.9 --alpha 0.01 --gamma 0.05 \
-  --baseline_lambda 0.5 \
-  --no_normalize_losses \
-  --out_dir outputs_1987_2026_ru
-```
-
-The input CSV needs a date column plus a risky-asset close and a risk-free column
-(a price by default, or an annualized yield in percent with `--rf_is_yield`).
-`--baseline_lambda` sets both `λ₁` and the fixed-weight comparison portfolio.
-Period filtering is available via `--year` / `--quarter` / `--months`, and
-`--tune_days` drops leading days from both the online method and the baseline.
-
-### Toxicity control
+## Reproducing the results
 
 ```bash
+# Investment: 4 betas over 2020-2026, ~1 minute
+bash run_20_26_ru.sh            # optional arg: target alpha (default 0.01)
+
+# Toxicity: 4 betas x 3 shift settings at T=10000
 bash toxicity_scores/run_ru.sh
 ```
 
-Edit the paths at the top of the script first: `DIRECTORY` points at a folder of
-`.pkl` files whose entries carry `detoxify_ft` (machine score) and
-`detoxify_human.toxicity` (human score) per response, and `CONFORMAL_PATH` at the
-pickled conformal sets used to fit the static-λ baseline. Both currently default
-to absolute `/scratch` paths.
+Both scripts resolve paths relative to themselves, so they work from any
+directory and from a fresh clone. Requirements: `numpy`, `pandas`,
+`matplotlib`, `scipy`, `tqdm`.
 
-To run a single configuration directly:
+### Investment sweep
+
+`run_20_26_ru.sh` pairs each CVaR level with the fixed weight whose risk matches
+the target, and writes CSVs plus CVaR / rolling-CVaR / `c_t` / `λ_t` /
+cumulative-return / loss plots into
+`outputs_2020_2026_ru_alpha<α>_gamma0.05_noclip_normalized/`:
+
+| β | `--baseline_lambda` |
+| --- | --- |
+| 0.90 | 0.36 |
+| 0.85 | 0.46 |
+| 0.80 | 0.54 |
+| 0.75 | 0.62 |
+
+The first 1,000 days are dropped as a tuning period (`--tune_days 1000`),
+leaving a 496-day evaluation window (2024-01-04 to 2025-12-31).
+
+> **Note.** This is the RU port of `run_20_26.sh`. Two flags from that script are
+> intentionally gone: `--c0` and `--eps` do not exist in the RU algorithm
+> (`c₁ = ½` and the AdaGrad-FTRL inner update replace them). `--lambda0` is also
+> not passed, because `online_cvar_invest_ru.py`'s `main()` forwards
+> `args.baseline_lambda` as `lambda0` to `run_one_setting()` — so `λ₁` always
+> equals `--baseline_lambda` and the `--lambda0` flag has no effect.
+
+### Toxicity sweep
+
+`run_ru.sh` sweeps β ∈ {0.75, 0.8, 0.85, 0.9} across three distribution-shift
+settings, where the sampling distribution over prompts is reweighted by a
+`Beta(a_t, b)` density on the toxicity score:
+
+- `uniform` — `a_t = 1` throughout.
+- `adversarial` — `a_t` ramps piecewise-linearly 0.5 → 1 → 3, shifting mass
+  toward toxic prompts over time.
+- `adversarial_jump` — the same ramp, punctuated by 5 short randomly placed
+  windows (all after `t = 1000`) that jump to `a ∈ {0.3, 5.0}`.
+
+Each run also fits a static-λ baseline by distortion risk control over 1,000
+candidate thresholds, for comparison against the adaptive λ.
+
+To run a single configuration:
 
 ```bash
 python toxicity_scores/online_cvar_detoxify_ru.py \
-  --directory <pkl_dir> --conformal_path <conformal.pkl> \
+  --directory toxicity_scores/data_slim/llama3.2_real_toxic \
+  --conformal_path toxicity_scores/data_slim/llama3.2_real_toxic/conformal_set_size_F1_0.26.pkl \
   --T 10000 --beta 0.9 --alpha 0.1 --gamma 0.05 --lambda0 1.0 \
   --beta_setting adversarial_jump --out_dir outputs_ru
 ```
 
-Note that the RU scripts take no `--eps`, `--c0`, `--burn_in` or `--truncated`
-flags — `c₁ = ½` and the AdaGrad-FTRL inner update replace them.
+## Data
 
-## Requirements
+The toxicity experiment uses Llama-3.2-3B generations on RealToxicityPrompts —
+9,500 prompts × 40 responses, each scored by a fine-tuned Detoxify model
+(machine score) and by the human-toxicity head, plus precomputed conformal sets.
 
-`numpy`, `pandas`, `matplotlib`, `scipy`, `tqdm`.
+The raw directory is 590 MB, and one file (`conformal_set_size_F1_0.26.pkl`,
+172 MB) exceeds GitHub's hard 100 MB per-file limit. It is therefore hosted on
+the Hugging Face Hub:
+
+> **[`Evangelinejy/online-cvar-llama3.2-real-toxic`](https://huggingface.co/datasets/Evangelinejy/online-cvar-llama3.2-real-toxic)**
+
+```bash
+bash toxicity_scores/download_raw_data.sh
+DATA_ROOT=toxicity_scores/data/llama3.2_real_toxic bash toxicity_scores/run_ru.sh
+```
+
+**You do not need the raw download.** `online_cvar_detoxify_ru.py` reads only
+four things from those pickles:
+
+- `detoxify_ft` — machine scores
+- `detoxify_human["toxicity"]` — human scores
+- the response *indices* in `conformal[key]["set"]` (the texts there are
+  discarded)
+- `pred`, which is loaded but never read afterwards
+
+The generated response texts and perplexities — ~99% of the bytes — are never
+used. `data_slim/` keeps only the fields above, in the identical nested
+structure, so the script runs against it unchanged. This was verified two ways:
+
+1. **Exhaustively**, over all 9,500 prompts: 380,000 machine scores and 380,000
+   human scores compare bit-for-bit equal, and every conformal index list
+   matches.
+2. **End to end**: the same configuration run against `data_slim/` and against
+   the raw data produced byte-identical output CSVs, the same static λ
+   (0.011900), and the same final realized CVaR (0.2612238774696986).
+
+Regenerate the slim copy with:
+
+```bash
+python toxicity_scores/build_slim_data.py \
+  --src toxicity_scores/data/llama3.2_real_toxic \
+  --dst toxicity_scores/data_slim/llama3.2_real_toxic
+```
+
+A side benefit is that no toxic generated text is published to this repository.
+
+> `generated_responses_999.pkl` is a 48-byte empty pickle in the source data and
+> contributes no prompts; it is kept so the file listing matches the raw
+> directory.

@@ -6,9 +6,14 @@
 # (c_1=1/2 and the AdaGrad--FTRL update replace them).
 set -euo pipefail
 
-# Set base paths
-DIRECTORY="/scratch/js15262/online_cvar/toxicity_scores/data/llama3.2_real_toxic"
-CONFORMAL_PATH="/scratch/js15262/online_cvar/toxicity_scores/data/llama3.2_real_toxic/conformal_set_size_F1_0.26.pkl"
+# Base paths. DATA_ROOT defaults to the slim (numeric-only) copy committed to
+# this repo, so a fresh clone runs without downloading anything. To run against
+# the raw generations instead -- identical results, see README -- override it:
+#   DATA_ROOT=/path/to/llama3.2_real_toxic bash run_ru.sh
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DATA_ROOT="${DATA_ROOT:-${SCRIPT_DIR}/data_slim/llama3.2_real_toxic}"
+DIRECTORY="${DIRECTORY:-${DATA_ROOT}}"
+CONFORMAL_PATH="${CONFORMAL_PATH:-${DATA_ROOT}/conformal_set_size_F1_0.26.pkl}"
 MODEL_NAME="Llama3.2-3B"
 
 # Fixed parameters (edit as needed)
@@ -38,7 +43,7 @@ for beta in "${BETAS[@]}"; do
     echo "Output: ${OUT_DIR}"
     echo "=========================================="
 
-    python online_cvar_detoxify_ru.py \
+    python "${SCRIPT_DIR}/online_cvar_detoxify_ru.py" \
       --directory "${DIRECTORY}" \
       --conformal_path "${CONFORMAL_PATH}" \
       --T "${T}" \

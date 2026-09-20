@@ -1,13 +1,28 @@
 # Whitelist-style ignore: everything is ignored by default and only the files
 # tracked in this repo are re-included. This keeps the local results_*/
-# outputs_*/ and data/ trees (several GB) out of version control.
+# outputs_*/ trees and the raw data/ generations (several GB) out of version
+# control. Note that a new file needs a matching "!" line below before git will
+# see it -- or use `git add -f <path>`.
 *
 
 !.gitignore
 !README.md
-!online_cvar_invest_ru.py
 
+# --- investment experiment ---
+!online_cvar_invest_ru.py
+!run_20_26_ru.sh
+!2020_2026.csv
+
+# --- toxicity experiment ---
 !toxicity_scores/
 toxicity_scores/*
 !toxicity_scores/online_cvar_detoxify_ru.py
 !toxicity_scores/run_ru.sh
+!toxicity_scores/build_slim_data.py
+!toxicity_scores/download_raw_data.sh
+
+# Slim (numeric-only) toxicity data: ~6 MB, enough to reproduce every result.
+# The raw generations live on the Hugging Face Hub instead -- see README.
+!toxicity_scores/data_slim/
+!toxicity_scores/data_slim/llama3.2_real_toxic/
+!toxicity_scores/data_slim/llama3.2_real_toxic/*.pkl
