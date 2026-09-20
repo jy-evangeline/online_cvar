@@ -92,10 +92,6 @@ The toxicity experiment uses Llama-3.2-3B generations on RealToxicityPrompts —
 9,500 prompts × 40 responses, each scored by a fine-tuned Detoxify model
 (machine score) and by the human-toxicity head, plus precomputed conformal sets.
 
-The raw directory is 590 MB, and one file (`conformal_set_size_F1_0.26.pkl`,
-172 MB) exceeds GitHub's hard 100 MB per-file limit. It is therefore hosted on
-the Hugging Face Hub:
-
 > **[`Evangelinejy/online-cvar-llama3.2-real-toxic`](https://huggingface.co/datasets/Evangelinejy/online-cvar-llama3.2-real-toxic)**
 
 ```bash
