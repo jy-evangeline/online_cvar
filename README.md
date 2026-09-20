@@ -23,19 +23,6 @@ Initialization is `c₁ = ½`, `q₀ = max(1, β/(1−β))²`. Because `c` is co
 `[0, 1]`, losses are expected on roughly that scale — the investment script
 normalizes them automatically (disable with `--no_normalize_losses`).
 
-## Contents
-
-| File | Description |
-| --- | --- |
-| `online_cvar_invest_ru.py` | Portfolio allocation. `λ_t` is the risky-asset weight; loss is `L_t(λ) = −(λ·r_risky + (1−λ)·r_rf)`, extended outside `[lam_min, lam_max]` by its inf/sup over the range (the loss is linear in `λ`, so both are attained at the endpoints). |
-| `run_20_26_ru.sh` | **Reproduces the investment results** on `2020_2026.csv` for β ∈ {0.90, 0.85, 0.80, 0.75}. |
-| `2020_2026.csv` | Daily S&P 500 close (`^GSPC`) and 10-year Treasury yield (`DGS10`), 2020-01-02 to 2025-12-31 (1,508 rows). |
-| `toxicity_scores/online_cvar_detoxify_ru.py` | LLM toxicity control. `λ_t` is a threshold on machine (fine-tuned Detoxify) scores; the loss is the human toxicity of the responses admitted at that threshold. Machine scores are rank-normalized to an empirical CDF on `(0, 1]`. |
-| `toxicity_scores/run_ru.sh` | **Reproduces the toxicity results**: 4 CVaR levels × 3 distribution-shift settings. |
-| `toxicity_scores/data_slim/` | Numeric-only toxicity data (~6 MB) — everything needed to reproduce. |
-| `toxicity_scores/build_slim_data.py` | Rebuilds `data_slim/` from the raw generations. |
-| `toxicity_scores/download_raw_data.sh` | Fetches the raw generations from the Hugging Face Hub. |
-
 ## Reproducing the results
 
 ```bash
