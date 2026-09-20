@@ -95,40 +95,12 @@ The toxicity experiment uses Llama-3.2-3B generations on RealToxicityPrompts —
 > **[`Evangelinejy/online-cvar-llama3.2-real-toxic`](https://huggingface.co/datasets/Evangelinejy/online-cvar-llama3.2-real-toxic)**
 
 ```bash
+# Fetch the raw generations, then run the sweep against them
 bash toxicity_scores/download_raw_data.sh
 DATA_ROOT=toxicity_scores/data/llama3.2_real_toxic bash toxicity_scores/run_ru.sh
-```
 
-**You do not need the raw download.** `online_cvar_detoxify_ru.py` reads only
-four things from those pickles:
-
-- `detoxify_ft` — machine scores
-- `detoxify_human["toxicity"]` — human scores
-- the response *indices* in `conformal[key]["set"]` (the texts there are
-  discarded)
-- `pred`, which is loaded but never read afterwards
-
-The generated response texts and perplexities — ~99% of the bytes — are never
-used. `data_slim/` keeps only the fields above, in the identical nested
-structure, so the script runs against it unchanged. This was verified two ways:
-
-1. **Exhaustively**, over all 9,500 prompts: 380,000 machine scores and 380,000
-   human scores compare bit-for-bit equal, and every conformal index list
-   matches.
-2. **End to end**: the same configuration run against `data_slim/` and against
-   the raw data produced byte-identical output CSVs, the same static λ
-   (0.011900), and the same final realized CVaR (0.2612238774696986).
-
-Regenerate the slim copy with:
-
-```bash
+# Rebuild data_slim/ from the raw generations
 python toxicity_scores/build_slim_data.py \
   --src toxicity_scores/data/llama3.2_real_toxic \
   --dst toxicity_scores/data_slim/llama3.2_real_toxic
 ```
-
-A side benefit is that no toxic generated text is published to this repository.
-
-> `generated_responses_999.pkl` is a 48-byte empty pickle in the source data and
-> contributes no prompts; it is kept so the file listing matches the raw
-> directory.
